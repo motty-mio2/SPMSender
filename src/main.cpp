@@ -5,6 +5,10 @@
 #include "secret.hpp"
 #include <WiFi.h>
 
+#define BATTERY_BAR_WIDTH (M5.Display.width() - 4 * M5.Display.fontWidth())
+
+constexpr float BATTERY_WARNING_LEVEL = 30;
+
 esp_now_peer_info_t peerInfo;  // 受信側情報のパラメータオブジェクト
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -18,7 +22,6 @@ void setup() {
 
   M5.begin(cfg);
   M5.Display.begin();
-  M5.Display.print("Hello World!!");
 
   // ESP Now
   WiFi.mode(WIFI_STA);  // Wi-Fi
@@ -46,13 +49,33 @@ void setup() {
 int temp;
 char buf[2];
 uint8_t data[2];
+unsigned long last_time = 0;
+int battery_level;
 
 void loop() {
   while (true) {
     delay(1);
     M5.update();
-    temp = 0;
 
+    if (millis() >= last_time) {
+      last_time = millis() + 5 * 1000;
+      battery_level = M5.Power.getBatteryLevel();
+
+      M5.Display.startWrite();
+      M5.Display.fillRect(0, 0, BATTERY_BAR_WIDTH, M5.Display.fontHeight(),
+                          TFT_BLACK);
+      M5.Display.fillRect(0, 0, BATTERY_BAR_WIDTH * battery_level / 100,
+                          M5.Display.fontHeight(),
+                          (M5.Power.isCharging()                     ? ORANGE
+                           : (battery_level > BATTERY_WARNING_LEVEL) ? GREEN
+                                                                     : RED));
+
+      M5.Display.setCursor(BATTERY_BAR_WIDTH, 0);
+      M5.Display.printf("%3ld%%", battery_level);
+      M5.Display.endWrite();
+    }
+
+    temp = 0;
     if (M5.BtnA.wasClicked()) {
       Serial.println("A is clicked");
       temp += 1;
